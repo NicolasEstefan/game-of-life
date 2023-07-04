@@ -3,7 +3,7 @@ import threading
 import time
 import copy
 
-TICK_TIME_MS = 150
+TICK_TIME_MS = 70
 PAINTBRUSH_KEY = 112
 QUIT_KEY = 113
 
