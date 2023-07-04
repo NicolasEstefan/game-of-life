@@ -3,6 +3,8 @@ import threading
 import time
 
 TICK_TIME_MS = 100
+PAINTBRUSH_KEY = 112
+QUIT_KEY = 113
 
 def setup(stdscr: curses.window) -> tuple[curses.window, curses.window]:
     stdscr.clear()
@@ -19,7 +21,7 @@ def setup(stdscr: curses.window) -> tuple[curses.window, curses.window]:
     title_win.clear()
     title_win.bkgd(' ', curses.color_pair(3))
     title_win.addstr(0, stdscr.getmaxyx()[1] // 2 - 6, "Game of life", curses.color_pair(2) | curses.A_BOLD)
-    title_win.addstr(1, stdscr.getmaxyx()[1] // 2 - 27, "k: toggle paintbrush | home: start simulation | q: quit", curses.color_pair(2) | curses.A_BOLD)
+    title_win.addstr(1, stdscr.getmaxyx()[1] // 2 - 27, "p: toggle paintbrush | home: start/pause simulation | q: quit", curses.color_pair(2) | curses.A_BOLD)
     title_win.refresh()
 
     board_win = curses.newwin(stdscr.getmaxyx()[0]-2, stdscr.getmaxyx()[1], 2, 0)
@@ -62,61 +64,67 @@ def simulate(board_win: curses.window, board: list[list[int]], stop_event: threa
                     if nbors == 3:
                         new_board[i][j] = 1
 
+        new_board[-1][-1] = 0 # set to zero because of curses bottom right corner bug
         board = new_board
         render_board(board_win, board)
         time.sleep(TICK_TIME_MS/1000)
+
+def start_simulation(board_win: curses.window, board: list[list[int]]) -> tuple[threading.Thread, threading.Event]:
+    stop_simulation_event = threading.Event()
+    simulation_thread = threading.Thread(target=simulate, args=(board_win, board, stop_simulation_event))
+    simulation_thread.start()
+    return (simulation_thread, stop_simulation_event)
+
+def stop_simulation(simulation_thread: threading.Thread, stop_simulation_event: threading.Event):
+    if(stop_simulation_event):
+        stop_simulation_event.set()
+    if(simulation_thread):
+        simulation_thread.join()
+    return (None, None)
 
 def main(stdscr: curses.window):
     title_win, board_win = setup(stdscr)    
 
     height, width = board_win.getmaxyx()
     cursor_y, cursor_x = 0, 0
-    is_painting = False
-    k = 0
+    stop_simulation_event: threading.Event = None
+    simulation_thread: threading.Thread = None
+    is_painting, is_simulating = False, False
+    key = 0
 
     board = [[0 for _ in range(width)] for _ in range(height)]
 
-    # input board initial state
-
-    while k != ord('q'):
-        if is_painting:
-            was_alive = board[cursor_y][cursor_x] == 1
-            board[cursor_y][cursor_x] = 0 if was_alive else 1
-            board_win.addch(' ', curses.color_pair(5) if was_alive else curses.color_pair(4))
-
-        match k:
-            case curses.KEY_UP:
-                cursor_y -= 1
-            case curses.KEY_LEFT:
-                cursor_x -= 1
-            case curses.KEY_DOWN:
-                cursor_y += 1
-            case curses.KEY_RIGHT:
-                cursor_x += 1
-            case 107:
-                is_painting = not is_painting
-            case curses.KEY_HOME:
-                break
-
-        cursor_x = max(0, cursor_x)
-        cursor_x = min(width - 1, cursor_x)
-        cursor_y = max(0, cursor_y)
-        cursor_y = min(height - 1, cursor_y)
-
-        board_win.move(cursor_y, cursor_x)
-        board_win.refresh()
-        k = stdscr.getch()
+    while True:
+        if key == curses.KEY_UP:
+            cursor_y -= 1
+        elif key == curses.KEY_LEFT:
+            cursor_x -= 1
+        elif key == curses.KEY_DOWN:
+            cursor_y += 1
+        elif key == curses.KEY_RIGHT:
+            cursor_x += 1
+        elif key == PAINTBRUSH_KEY:
+            is_painting = not is_painting
+        elif key == QUIT_KEY:
+            stop_simulation(simulation_thread, stop_simulation_event)    
+            break
     
-    # start simulation
+        if not is_simulating:
+            
+            cursor_y = max(0, cursor_y)
+            cursor_y = min(height-1, cursor_y)
+            cursor_x = max(0, cursor_x)
+            cursor_x = min(width-1, cursor_x)
 
-    curses.curs_set(0)
-    stop_simulation_event = threading.Event()
-    simulation_thread = threading.Thread(target=simulate, args=(board_win, board, stop_simulation_event))
-    simulation_thread.start()
+            board_win.move(cursor_y, cursor_x)
 
-    while(k != ord('q')):
-        k = stdscr.getch()
+            if is_painting:
+                if not(cursor_x == width-1 and cursor_y == height-1): # printing a char at the bottom left corner
+                    board_win.addch(' ', curses.color_pair(4))        # raises an exception  
+                    board[cursor_y][cursor_x] ^= 1
 
-    stop_simulation_event.set()
+            board_win.refresh()
+        
+        key = stdscr.getch()
 
 curses.wrapper(main)
