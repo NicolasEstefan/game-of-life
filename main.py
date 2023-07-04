@@ -1,6 +1,7 @@
 import curses
 import threading
 import time
+import copy
 
 TICK_TIME_MS = 100
 PAINTBRUSH_KEY = 112
@@ -53,22 +54,29 @@ def count_nbors(board: list[list[int]], y: int, x: int):
     return nbors
 
 def simulate(board_win: curses.window, board: list[list[int]], stop_event: threading.Event):
-    while not stop_event.is_set():
-        new_board = [[0 for _ in range(len(board[0]))] for _ in range(len(board))]
 
-        for i in range(0, len(board)):
-            for j in range(0, len(board[i])):
-                nbors = count_nbors(board, i, j)
-                if board[i][j] == 1:
+    board_copy = copy.deepcopy(board)
+
+    while not stop_event.is_set():
+        new_board = [[0 for _ in range(len(board_copy[0]))] for _ in range(len(board_copy))]
+
+        for i in range(0, len(board_copy)):
+            for j in range(0, len(board_copy[i])):
+                nbors = count_nbors(board_copy, i, j)
+                if board_copy[i][j] == 1:
                     new_board[i][j] = 1 if (nbors == 2 or nbors == 3) else 0
                 else:
                     if nbors == 3:
                         new_board[i][j] = 1
 
         new_board[-1][-1] = 0 # set to zero because of curses bottom right corner bug
-        board = new_board
-        render_board(board_win, board)
+        board_copy = new_board
+        render_board(board_win, board_copy)
         time.sleep(TICK_TIME_MS/1000)
+    
+    for i in range(0, len(board_copy)):
+            for j in range(0, len(board_copy[i])):
+                board[i][j] = board_copy[i][j]
     
 def start_simulation(board_win: curses.window, board: list[list[int]]) -> tuple[threading.Thread, threading.Event]:
     stop_simulation_event = threading.Event()
