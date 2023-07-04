@@ -3,7 +3,7 @@ import threading
 import time
 import copy
 
-TICK_TIME_MS = 100
+TICK_TIME_MS = 150
 PAINTBRUSH_KEY = 112
 QUIT_KEY = 113
 
@@ -136,7 +136,7 @@ def main(stdscr: curses.window):
 
             if is_painting:
                 board_win.addch(' ', curses.color_pair(4))          
-                board[cursor_y][cursor_x] ^= 1
+                board[cursor_y][cursor_x] = 1
 
             board_win.move(cursor_y, cursor_x)
             board_win.refresh()
