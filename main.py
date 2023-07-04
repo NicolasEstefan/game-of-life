@@ -11,6 +11,7 @@ def setup(stdscr: curses.window) -> tuple[curses.window, curses.window]:
     stdscr.refresh()
     curses.start_color()
     curses.use_default_colors()
+    curses.curs_set(2)
     curses.init_pair(1, curses.COLOR_RED, curses.COLOR_RED)
     curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_WHITE)
@@ -24,8 +25,8 @@ def setup(stdscr: curses.window) -> tuple[curses.window, curses.window]:
     title_win.addstr(1, stdscr.getmaxyx()[1] // 2 - 27, "p: toggle paintbrush | home: start/pause simulation | q: quit", curses.color_pair(2) | curses.A_BOLD)
     title_win.refresh()
 
-    board_win = curses.newwin(stdscr.getmaxyx()[0]-2, stdscr.getmaxyx()[1], 2, 0)
-    board_win.clear()
+    board_win = curses.newwin(stdscr.getmaxyx()[0]-1, stdscr.getmaxyx()[1]+1, 2, 0) # hacky solution to not being able
+    board_win.clear()                                                               # to print in the bot rigth corner
     board_win.refresh()
 
     return (title_win, board_win)
@@ -85,7 +86,7 @@ def stop_simulation(simulation_thread: threading.Thread, stop_simulation_event: 
 def main(stdscr: curses.window):
     title_win, board_win = setup(stdscr)    
 
-    height, width = board_win.getmaxyx()
+    height, width = board_win.getmaxyx()[0]-1, board_win.getmaxyx()[1]-1
     cursor_y, cursor_x = 0, 0
     stop_simulation_event: threading.Event = None
     simulation_thread: threading.Thread = None
@@ -110,19 +111,16 @@ def main(stdscr: curses.window):
             break
     
         if not is_simulating:
-            
-            cursor_y = max(0, cursor_y)
-            cursor_y = min(height-1, cursor_y)
             cursor_x = max(0, cursor_x)
-            cursor_x = min(width-1, cursor_x)
-
-            board_win.move(cursor_y, cursor_x)
+            cursor_x = min(width - 1, cursor_x)
+            cursor_y = max(0, cursor_y)
+            cursor_y = min(height - 1, cursor_y)
 
             if is_painting:
-                if not(cursor_x == width-1 and cursor_y == height-1): # printing a char at the bottom left corner
-                    board_win.addch(' ', curses.color_pair(4))        # raises an exception  
-                    board[cursor_y][cursor_x] ^= 1
+                board_win.addch(' ', curses.color_pair(4))          
+                board[cursor_y][cursor_x] ^= 1
 
+            board_win.move(cursor_y, cursor_x)
             board_win.refresh()
         
         key = stdscr.getch()
