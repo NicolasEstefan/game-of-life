@@ -69,7 +69,7 @@ def simulate(board_win: curses.window, board: list[list[int]], stop_event: threa
         board = new_board
         render_board(board_win, board)
         time.sleep(TICK_TIME_MS/1000)
-
+    
 def start_simulation(board_win: curses.window, board: list[list[int]]) -> tuple[threading.Thread, threading.Event]:
     stop_simulation_event = threading.Event()
     simulation_thread = threading.Thread(target=simulate, args=(board_win, board, stop_simulation_event))
@@ -106,6 +106,16 @@ def main(stdscr: curses.window):
             cursor_x += 1
         elif key == PAINTBRUSH_KEY:
             is_painting = not is_painting
+        elif key == curses.KEY_HOME:
+            if is_simulating:
+                simulation_thread, stop_simulation_event = stop_simulation(simulation_thread, stop_simulation_event)
+                is_simulating = False
+                curses.curs_set(1)
+            else:
+                simulation_thread, stop_simulation_event = start_simulation(board_win, board)
+                is_simulating = True
+                curses.curs_set(0)
+
         elif key == QUIT_KEY:
             stop_simulation(simulation_thread, stop_simulation_event)    
             break
